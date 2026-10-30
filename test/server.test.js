@@ -6,6 +6,34 @@ const path = require('node:path');
 const test = require('node:test');
 const { createLibraryServer } = require('../server');
 
+test('serves the library web interface from the root without exposing other files', async () => {
+  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'radio-library-'));
+  const server = createLibraryServer({ dataDirectory: path.join(storage, 'discs') });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    const response = await fetch(`${baseUrl}/`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /text\/html; charset=utf-8/);
+    const page = await response.text();
+    assert.match(page, /Biblioteca musical/);
+    assert.match(page, /id="discSelect" required/);
+    assert.match(page, /id="previewAudio"/);
+    assert.match(page, /id="filenameInput"/);
+    assert.match(page, /id="createDiscButton"/);
+
+    assert.equal((await fetch(`${baseUrl}/index.html`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/server.js`)).status, 404);
+  } finally {
+    const closed = once(server, 'close');
+    server.close();
+    await closed;
+    fs.rmSync(storage, { recursive: true, force: true });
+  }
+});
+
 test('external library creates named empty discs and reuses them when uploading tracks', async () => {
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'radio-library-'));
   const server = createLibraryServer({ dataDirectory: path.join(storage, 'discs') });

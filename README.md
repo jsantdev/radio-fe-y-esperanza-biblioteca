@@ -1,6 +1,6 @@
 # Biblioteca musical
 
-Servicio HTTP para guardar y reproducir archivos de audio organizados por disco. La API permite crear discos, cargar y listar temas, transmitir audio (incluidos rangos para reproducción parcial) y eliminar temas.
+Servicio HTTP con una interfaz web para organizar, escuchar y subir archivos de audio por disco. También incluye una API para crear discos, cargar y listar temas, transmitir audio (incluidos rangos para reproducción parcial) y eliminar temas.
 
 ## Requisitos
 
@@ -19,6 +19,8 @@ El proyecto no requiere paquetes npm de terceros.
 6. Asigna un dominio o una ruta de proxy al servicio. Comprueba el estado con `GET /api/health`.
 
 **No omitas el volumen persistente.** Sin él, los discos y audios se guardan en el sistema de archivos efímero del contenedor y pueden perderse al reconstruir o reemplazar el servicio. Haz copias de seguridad del volumen montado.
+
+Al abrir el dominio del servicio se muestra el administrador web de la biblioteca. Desde ahí puedes crear y seleccionar un disco, elegir un archivo, escucharlo antes de subirlo, cambiar el nombre con el que se guardará y consultar o reproducir los temas existentes. Para guardar un tema siempre hay que seleccionar un disco. El nombre cambiado se aplica al archivo guardado; el archivo original del dispositivo no se modifica.
 
 ### Seguridad de publicación
 

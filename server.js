@@ -121,6 +121,16 @@ function createLibraryServer({
 
   async function handleRequest(request, response) {
     const requestUrl = new URL(request.url, 'http://localhost');
+    if (request.method === 'GET' && (requestUrl.pathname === '/' || requestUrl.pathname === '/index.html')) {
+      const page = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': page.length,
+        'Cache-Control': 'no-cache',
+      });
+      response.end(page);
+      return;
+    }
     if (request.method === 'GET' && requestUrl.pathname === '/api/health') {
       sendJson(response, 200, { ok: true });
       return;
