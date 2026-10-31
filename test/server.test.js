@@ -15,6 +15,8 @@ test('external library creates named empty discs and reuses them when uploading 
   try {
     const page = await fetch(baseUrl).then((response) => response.text());
     assert.match(page, /Subir temas por disco/);
+    assert.match(page, /Borrar disco/);
+    assert.match(page, /Borrar tema/);
     assert.match(page, /Repetir playlist al llegar al final/);
     assert.match(page, /Programar canciones/);
     assert.match(page, /rel="manifest" href="\/manifest.webmanifest"/);
@@ -181,6 +183,65 @@ test('external library creates, lists, reads, and deletes audio grouped by disc'
     const remainingDisc = (await fetch(`${baseUrl}/api/discs`).then((response) => response.json())).discs[0];
     assert.equal(remainingDisc.name, 'Mi Álbum');
     assert.deepEqual(remainingDisc.tracks, []);
+  } finally {
+    const closed = once(server, 'close');
+    server.close();
+    await closed;
+    fs.rmSync(storage, { recursive: true, force: true });
+  }
+});
+
+test('deleting a disc removes its tracks from the library, playlist, and schedules', async () => {
+  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'radio-delete-disc-'));
+  const server = createLibraryServer({ dataDirectory: path.join(storage, 'discs') });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  async function upload(disc, filename) {
+    const response = await fetch(`${baseUrl}/api/tracks?disc=${encodeURIComponent(disc)}`, {
+      method: 'POST',
+      headers: { 'X-File-Name': encodeURIComponent(filename), 'Content-Type': 'audio/mpeg' },
+      body: Buffer.from(filename),
+    });
+    assert.equal(response.status, 201);
+    return (await response.json()).track;
+  }
+
+  try {
+    const first = await upload('Disco para borrar', 'Primera.mp3');
+    const second = await upload('Disco para borrar', 'Segunda.mp3');
+    const keep = await upload('Disco conservado', 'Conservar.mp3');
+    const playlist = await fetch(`${baseUrl}/api/player/playlist`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tracks: [first.id, keep.id, second.id] }),
+    });
+    assert.equal(playlist.status, 200);
+    const schedule = await fetch(`${baseUrl}/api/schedules`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schedules: [{
+          id: 'delete-disc-schedule',
+          trackId: second.id,
+          scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          recurrence: 'once',
+        }],
+      }),
+    });
+    assert.equal(schedule.status, 200);
+
+    const deleted = await fetch(`${baseUrl}/api/discs?id=${encodeURIComponent(first.discId)}`, { method: 'DELETE' });
+    assert.equal(deleted.status, 200);
+    const library = await fetch(`${baseUrl}/api/discs`).then((response) => response.json());
+    assert.deepEqual(library.discs.map((disc) => disc.id), [keep.discId]);
+    const player = await fetch(`${baseUrl}/api/player/state`).then((response) => response.json());
+    assert.deepEqual(player.queue.map((track) => track.id), [keep.id]);
+    assert.equal(player.currentTrack.id, keep.id);
+    const schedules = await fetch(`${baseUrl}/api/schedules`).then((response) => response.json());
+    assert.deepEqual(schedules.schedules, []);
+    assert.equal((await fetch(`${baseUrl}/api/audio?id=${encodeURIComponent(first.id)}`)).status, 404);
   } finally {
     const closed = once(server, 'close');
     server.close();

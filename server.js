@@ -64,6 +64,25 @@ function createLibraryServer({
     return getPlayerSnapshot();
   }
 
+  function removeTracksFromPlayer(trackIds) {
+    const removed = new Set(trackIds);
+    if (playerState.queue.some((id) => removed.has(id))) {
+      const selectedTrack = playerState.currentIndex === null ? null : playerState.queue[playerState.currentIndex];
+      const queue = playerState.queue.filter((id) => !removed.has(id));
+      const currentIndex = selectedTrack && queue.includes(selectedTrack)
+        ? queue.indexOf(selectedTrack)
+        : queue.length ? 0 : null;
+      savePlayerState({
+        ...playerState,
+        queue,
+        currentIndex,
+        isPlaying: currentIndex === null ? false : playerState.isPlaying,
+      });
+    }
+    const nextSchedules = schedules.filter((schedule) => !removed.has(schedule.trackId));
+    if (nextSchedules.length !== schedules.length) saveSchedules(nextSchedules);
+  }
+
   function getPlayerSnapshot() {
     const tracks = new Map(listDiscs().flatMap((disc) => disc.tracks.map((track) => [track.id, track])));
     const queue = playerState.queue.map((id) => {
@@ -502,6 +521,24 @@ function createLibraryServer({
       sendJson(response, result.created ? 201 : 200, result);
       return;
     }
+    if (request.method === 'DELETE' && requestUrl.pathname === '/api/discs') {
+      const discId = requestUrl.searchParams.get('id');
+      if (typeof discId !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(discId)) {
+        sendJson(response, 400, { ok: false, message: 'El disco indicado no es válido.' });
+        return;
+      }
+      const discDirectory = path.resolve(rootDirectory, discId);
+      if (path.dirname(discDirectory) !== rootDirectory || !fs.existsSync(discDirectory)
+        || !fs.statSync(discDirectory).isDirectory()) {
+        sendJson(response, 404, { ok: false, message: 'No se encontró el disco.' });
+        return;
+      }
+      const trackIds = listDiscs().find((disc) => disc.id === discId)?.tracks.map((track) => track.id) || [];
+      fs.rmSync(discDirectory, { recursive: true });
+      removeTracksFromPlayer(trackIds);
+      sendJson(response, 200, { ok: true });
+      return;
+    }
     if (request.method === 'POST' && requestUrl.pathname === '/api/tracks') {
       const discName = requestUrl.searchParams.get('disc')?.trim() || '';
       const discId = getDiscId(discName);
@@ -566,21 +603,7 @@ function createLibraryServer({
         return;
       }
       fs.unlinkSync(filePath);
-      if (playerState.queue.includes(trackId)) {
-        const selectedTrack = playerState.currentIndex === null ? null : playerState.queue[playerState.currentIndex];
-        const queue = playerState.queue.filter((id) => id !== trackId);
-        const currentIndex = selectedTrack && queue.includes(selectedTrack)
-          ? queue.indexOf(selectedTrack)
-          : queue.length ? 0 : null;
-        savePlayerState({
-          ...playerState,
-          queue,
-          currentIndex,
-          isPlaying: currentIndex === null ? false : playerState.isPlaying,
-        });
-      }
-      const nextSchedules = schedules.filter((schedule) => schedule.trackId !== trackId);
-      if (nextSchedules.length !== schedules.length) saveSchedules(nextSchedules);
+      removeTracksFromPlayer([trackId]);
       sendJson(response, 200, { ok: true });
       return;
     }

@@ -36,6 +36,10 @@
       .track-list { display: grid; gap: 8px; padding: 0; list-style: none; }
       .track { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
       .library-track { padding: 10px 12px; border-radius: 12px; background: #111813; }
+      .disc-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; }
+      .disc-heading > span { min-width: 0; overflow-wrap: anywhere; color: var(--accent); font-weight: 700; }
+      .disc-heading button, .library-actions .danger { min-height: 38px; padding: 6px 10px; }
+      .library-actions { display: flex; flex: 0 0 auto; gap: 6px; }
       .track-title { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
       .upload-file { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1; gap: 6px; min-width: 0; }
       .upload-file > span:first-child { grid-column: 1 / -1; }
@@ -59,7 +63,9 @@
         .track { align-items: flex-start; }
         .library-track { align-items: center; flex-direction: row; }
         .library-track .track-title { flex: 1; }
-        .library-track button { flex: 0 0 auto; min-width: 94px; }
+        .library-track button { flex: 0 0 auto; min-width: 74px; }
+        .library-actions { flex-wrap: wrap; }
+        .library-actions button { min-width: 0; }
         .track-actions { width: 100%; flex-wrap: wrap; }
         .track-actions button { flex: 1; min-width: 62px; }
         .row > * { min-width: 0; }
@@ -297,8 +303,17 @@
         scheduleTrack.replaceChildren(new Option('Elige un tema', ''));
         for (const disc of discs) {
           const heading = document.createElement('li');
-          heading.className = 'disc-title';
-          heading.textContent = disc.name;
+          heading.className = 'disc-heading';
+          const discName = document.createElement('span');
+          discName.textContent = `${disc.name} · ${disc.tracks.length} ${disc.tracks.length === 1 ? 'tema' : 'temas'}`;
+          const deleteDiscButton = document.createElement('button');
+          deleteDiscButton.type = 'button';
+          deleteDiscButton.className = 'danger';
+          deleteDiscButton.textContent = 'Borrar disco';
+          deleteDiscButton.setAttribute('aria-label', `Borrar disco ${disc.name}`);
+          deleteDiscButton.disabled = busy;
+          deleteDiscButton.addEventListener('click', () => deleteDisc(disc));
+          heading.append(discName, deleteDiscButton);
           libraryTracks.append(heading);
           for (const track of disc.tracks) {
             const row = document.createElement('li');
@@ -317,9 +332,19 @@
               state.repeat !== false,
               `${track.title} agregado a la playlist.`,
             ));
+            const deleteTrackButton = document.createElement('button');
+            deleteTrackButton.type = 'button';
+            deleteTrackButton.className = 'danger';
+            deleteTrackButton.textContent = 'Borrar';
+            deleteTrackButton.setAttribute('aria-label', `Borrar tema ${track.title}`);
+            deleteTrackButton.disabled = busy;
+            deleteTrackButton.addEventListener('click', () => deleteTrack(track));
+            const actions = document.createElement('div');
+            actions.className = 'library-actions';
+            actions.append(add, deleteTrackButton);
             row.classList.add('library-track');
             row.setAttribute('aria-label', `${track.title}, disco ${disc.name}`);
-            row.append(title, add);
+            row.append(title, actions);
             libraryTracks.append(row);
             scheduleTrack.add(new Option(`${disc.name} · ${track.title}`, track.id));
           }
@@ -431,6 +456,23 @@
             body: JSON.stringify({ tracks: trackNames, repeat }),
           });
         }, successMessage);
+      }
+
+      function deleteTrack(track) {
+        if (!window.confirm(`¿Borrar "${track.title}"? Se quitará también de la playlist y de las canciones programadas.`)) return;
+        return runAction(async () => {
+          await requestJson(`/api/tracks?id=${encodeURIComponent(track.id)}`, { method: 'DELETE' });
+        }, `Tema "${track.title}" borrado.`);
+      }
+
+      function deleteDisc(disc) {
+        const detail = disc.tracks.length
+          ? ` Se borrarán también sus ${disc.tracks.length} ${disc.tracks.length === 1 ? 'tema' : 'temas'}, y se quitarán de la playlist y de las canciones programadas.`
+          : '';
+        if (!window.confirm(`¿Borrar el disco "${disc.name}"?${detail}`)) return;
+        return runAction(async () => {
+          await requestJson(`/api/discs?id=${encodeURIComponent(disc.id)}`, { method: 'DELETE' });
+        }, `Disco "${disc.name}" borrado.`);
       }
 
       function reorder(index, direction) {
