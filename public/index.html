@@ -1,466 +1,440 @@
 <!doctype html>
 <html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#11130f">
-  <meta name="description" content="Organiza, escucha y sube música a tu biblioteca por discos.">
-  <title>Biblioteca musical</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #11130f;
-      color: #f2f0e9;
-      font-synthesis: none;
-      text-rendering: optimizeLegibility;
-      --surface: #1a1d18;
-      --surface-raised: #20231d;
-      --line: #34372f;
-      --muted: #9c9f93;
-      --lime: #d3f36b;
-      --lime-ink: #1a2110;
-      --danger: #ff9a8b;
-    }
-    * { box-sizing: border-box; }
-    body { min-width: 320px; min-height: 100vh; margin: 0; }
-    button, input, select { font: inherit; }
-    button { cursor: pointer; }
-    .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 64px; }
-    .topbar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
-    .brand { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
-    .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: var(--lime); color: var(--lime-ink); }
-    .brand-mark svg { width: 20px; height: 20px; }
-    .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px #d3f36666; }
-    .hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 44px 0 30px; }
-    .eyebrow { margin: 0 0 12px; color: var(--lime); font-size: 11px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
-    h1 { max-width: 670px; margin: 0; font-size: clamp(32px, 5vw, 55px); font-weight: 650; letter-spacing: -.055em; line-height: 1.06; }
-    .hero-copy { max-width: 390px; margin: 14px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
-    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .82fr); align-items: start; gap: 18px; }
-    .card { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
-    .upload-card { padding: 24px; }
-    .card-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
-    .card-heading h2, .library-heading h2 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -.025em; }
-    .card-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-    .step { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--lime); font-size: 12px; }
-    .field { margin-top: 20px; }
-    .field-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: #e8e7df; font-size: 12px; font-weight: 600; }
-    .optional, .hint { color: var(--muted); font-size: 11px; font-weight: 400; }
-    input[type="text"], select { width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; outline: none; background: #141612; color: #f2f0e9; }
-    input[type="text"]:focus, select:focus { border-color: #b6d84e; box-shadow: 0 0 0 3px #d3f36b1c; }
-    input::placeholder { color: #777a70; }
-    select:invalid { color: #85877e; }
-    .create-disc { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 9px; }
-    .secondary-button { min-height: 42px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); color: #e7e6dc; font-size: 12px; font-weight: 600; }
-    .secondary-button:hover { border-color: #686b5e; background: #292c25; }
-    .file-picker { position: relative; display: grid; min-height: 104px; place-items: center; padding: 18px; border: 1px dashed #55594b; border-radius: 12px; background: #151712; text-align: center; transition: border-color .15s, background .15s; }
-    .file-picker:hover, .file-picker:focus-within { border-color: var(--lime); background: #1b2014; }
-    .file-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-    .file-icon { display: grid; width: 30px; height: 30px; margin: 0 auto 8px; place-items: center; border-radius: 9px; background: #292d21; color: var(--lime); }
-    .file-icon svg { width: 17px; height: 17px; }
-    .file-title { margin: 0; font-size: 12px; font-weight: 600; }
-    .file-hint { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
-    .preview-wrap { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #151712; }
-    .preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--muted); font-size: 11px; }
-    audio { display: block; width: 100%; height: 38px; }
-    .field-hint { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-    .submit-button { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: 9px; margin-top: 22px; border: 0; border-radius: 11px; background: var(--lime); color: var(--lime-ink); font-size: 13px; font-weight: 750; transition: transform .12s, opacity .12s; }
-    .submit-button:hover:not(:disabled) { transform: translateY(-1px); }
-    .submit-button:disabled { cursor: not-allowed; opacity: .46; }
-    .submit-button svg { width: 17px; height: 17px; }
-    .message { margin: 14px 0 0; padding: 11px 12px; border: 1px solid #495136; border-radius: 9px; background: #20251a; color: var(--lime); font-size: 12px; line-height: 1.5; }
-    .message.error { border-color: #633d36; background: #281c19; color: var(--danger); }
-    .side-card { padding: 20px; }
-    .library-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-    .count { color: var(--muted); font-size: 11px; }
-    .disc-list { display: grid; gap: 10px; }
-    .disc { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #151712; }
-    .disc summary { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 13px; cursor: pointer; list-style: none; }
-    .disc summary::-webkit-details-marker { display: none; }
-    .disc summary::after { width: 7px; height: 7px; flex: 0 0 auto; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); content: ""; transform: rotate(45deg) translateY(-2px); transition: transform .15s; }
-    .disc[open] summary::after { transform: rotate(225deg) translate(-2px, -1px); }
-    .disc-name { overflow: hidden; color: #e8e7df; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-    .disc-count { margin-left: auto; color: var(--muted); font-size: 10px; white-space: nowrap; }
-    .track-list { display: grid; gap: 12px; padding: 2px 12px 13px; }
-    .track { min-width: 0; padding-top: 11px; border-top: 1px solid #2c2f28; }
-    .track-name { overflow: hidden; margin: 0 0 8px; color: #d1d0c8; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-    .empty-state { padding: 25px 14px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
-    .library-note { margin: 14px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
-    .footer { margin-top: 24px; color: #777a70; font-size: 10px; text-align: center; }
-    @media (max-width: 760px) {
-      .shell { width: min(100% - 28px, 560px); padding-top: 20px; }
-      .hero { align-items: start; padding: 34px 0 22px; }
-      .hero-copy { max-width: 330px; }
-      .layout { grid-template-columns: 1fr; }
-      .upload-card { padding: 20px; }
-    }
-    @media (max-width: 420px) {
-      .shell { width: calc(100% - 24px); }
-      .hero { padding-top: 28px; }
-      .status { font-size: 0; }
-      .upload-card { padding: 17px; }
-      .create-disc { grid-template-columns: 1fr; }
-      .secondary-button { width: 100%; }
-    }
-  </style>
-</head>
-<body>
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M9 18V5l12-2v13M9 18c0 1.66-1.57 3-3.5 3S2 19.66 2 18s1.57-3 3.5-3S9 16.34 9 18Zm12-2c0 1.66-1.57 3-3.5 3S14 17.66 14 16s1.57-3 3.5-3 3.5 1.34 3.5 3ZM9 9l12-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        Biblioteca musical
-      </div>
-      <div class="status"><span class="status-dot" aria-hidden="true"></span><span id="connectionStatus">Conectando</span></div>
-    </header>
-
-    <section class="hero" aria-labelledby="pageTitle">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101512">
+    <meta name="description" content="Biblioteca musical y reproductor persistente de Fe y Esperanza Radio.">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <title>Biblioteca musical | Radio</title>
+    <style>
+      :root { color-scheme: dark; font: 16px "Segoe UI", sans-serif; color: #edf1ec; background: #0e120f; --surface: #151a16; --line: #29312b; --muted: #9aa59c; --accent: #c5f36b; }
+      * { box-sizing: border-box; }
+      body { max-width: 1100px; margin: auto; padding: 24px 16px 48px; }
+      header, section { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 18px; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+      h1, h2, p { margin-top: 0; }
+      h1 { margin-bottom: 4px; font-size: 1.6rem; }
+      h2 { font-size: 1.1rem; }
+      .muted, .hint { color: var(--muted); }
+      .hint { line-height: 1.5; }
+      .layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+      .wide { grid-column: 1 / -1; }
+      label { display: grid; gap: 7px; }
+      input, select { width: 100%; min-height: 42px; padding: 9px; border: 1px solid #465047; border-radius: 8px; color: inherit; background: #111612; font: inherit; }
+      button { min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: 8px; color: #17200c; background: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+      button.secondary { border-color: var(--line); color: inherit; background: #202822; }
+      button.danger { border-color: #614044; color: #ffc9cb; background: #382427; }
+      button:disabled { cursor: not-allowed; opacity: .5; }
+      .row { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+      .row > * { flex: 1; min-width: 150px; }
+      .track-list { display: grid; gap: 8px; padding: 0; list-style: none; }
+      .track { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+      .track-actions { display: flex; gap: 5px; flex: 0 0 auto; }
+      .track-actions button { min-width: 40px; }
+      .disc-title { margin: 14px 0 4px; color: var(--accent); font-weight: 700; }
+      #notice { min-height: 1.4em; margin: 10px 0; }
+      .error { color: #ff9298; }
+      .success { color: var(--accent); }
+      #radioStatus { color: var(--accent); }
+      @media (max-width: 680px) {
+        .layout { grid-template-columns: 1fr; }
+        .wide { grid-column: auto; }
+        .track { align-items: stretch; flex-direction: column; }
+        .track-actions button { flex: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
       <div>
-        <p class="eyebrow">Tu colección, en un solo lugar</p>
-        <h1 id="pageTitle">Cada canción<br>en su propio disco.</h1>
+        <p class="muted">FE Y ESPERANZA · RADIO</p>
+        <h1>Biblioteca musical</h1>
+        <p class="hint">Organiza discos, administra la playlist, programa canciones y configura sus bucles.</p>
+        <p class="hint">Para instalar en Android, abre esta página en Chrome y elige ⋮ → Instalar aplicación. Se requiere HTTPS.</p>
+        <a href="/backend">Configuración técnica de radio ↗</a>
       </div>
-      <p class="hero-copy">Organiza tu música, escucha antes de guardarla y encuentra cada tema cuando lo necesites.</p>
-    </section>
+      <p id="radioStatus" role="status">Conectando con la radio…</p>
+    </header>
+    <p id="notice" role="status" aria-live="polite"></p>
 
-    <div class="layout">
-      <section class="card upload-card" aria-labelledby="uploadTitle">
-        <div class="card-heading">
-          <div>
-            <h2 id="uploadTitle">Subir un tema</h2>
-            <p>Elige el disco, revisa el audio y guarda tu canción.</p>
-          </div>
-          <span class="step" aria-hidden="true">01</span>
-        </div>
-
+    <main class="layout">
+      <section>
+        <h2>Subir temas por disco</h2>
         <form id="uploadForm">
-          <div class="field">
-            <label class="field-label" for="discSelect">Disco <span>Obligatorio</span></label>
+          <label for="discSelect">Disco de destino
             <select id="discSelect" required>
-              <option value="">Selecciona un disco</option>
+              <option value="">Elige un disco</option>
+              <option value="__create__">Crear disco nuevo…</option>
             </select>
-            <div class="create-disc">
-              <input id="newDiscName" type="text" maxlength="100" placeholder="O escribe el nombre de un disco nuevo" aria-label="Nombre del disco nuevo">
-              <button id="createDiscButton" class="secondary-button" type="button">Crear disco</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field-label" for="fileInput">Archivo de audio <span>Máximo 100 MB</span></label>
-            <label class="file-picker" for="fileInput">
-              <span>
-                <span class="file-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </span>
-                <span id="fileTitle" class="file-title">Selecciona un archivo</span>
-                <span id="fileHint" class="file-hint">MP3, M4A, WAV, OGG, OPUS o AAC</span>
-              </span>
-              <input id="fileInput" type="file" accept=".aac,.m4a,.mp3,.ogg,.opus,.wav,audio/*" required aria-label="Seleccionar archivo de audio">
+          </label>
+          <div id="newDiscRow" class="row" hidden>
+            <label for="newDiscName">Nombre del disco
+              <input id="newDiscName" maxlength="100" placeholder="Ej.: Mi álbum">
             </label>
+            <button id="createDisc" type="button" class="secondary">Crear disco</button>
           </div>
-
-          <div id="previewWrap" class="preview-wrap" hidden>
-            <div class="preview-heading"><span>Vista previa</span><span id="fileSize"></span></div>
-            <audio id="previewAudio" controls preload="metadata">Tu navegador no admite la reproducción de audio.</audio>
-          </div>
-
-          <div class="field">
-            <label class="field-label" for="filenameInput">Nombre con el que se guardará <span>Editable</span></label>
-            <input id="filenameInput" type="text" maxlength="180" placeholder="Ejemplo: mi-cancion.mp3" required autocomplete="off" spellcheck="false">
-            <p class="field-hint">Conserva una extensión de audio compatible. El archivo original de tu dispositivo no se modifica.</p>
-          </div>
-
-          <button id="uploadButton" class="submit-button" type="submit" disabled>
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5V19a1 1 0 0 0 1 1h14v-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Guardar en el disco
-          </button>
-          <p id="formMessage" class="message" role="status" aria-live="polite" hidden></p>
+          <label for="audioFiles">Archivos de audio (puedes seleccionar varios)
+            <input id="audioFiles" type="file" multiple required disabled accept=".aac,.m4a,.mp3,.ogg,.opus,.wav">
+          </label>
+          <p class="hint">MP3, WAV, OGG, OPUS, M4A o AAC · Máximo 100 MB por tema.</p>
+          <button id="uploadButton" type="submit" disabled>Subir temas</button>
         </form>
       </section>
 
-      <aside class="card side-card" aria-labelledby="libraryTitle">
-        <div class="library-heading">
-          <h2 id="libraryTitle">Tu biblioteca</h2>
-          <span id="libraryCount" class="count"></span>
-        </div>
-        <div id="discList" class="disc-list" aria-live="polite">
-          <div class="empty-state">Cargando tus discos…</div>
-        </div>
-        <p class="library-note">Los archivos se guardan en el almacenamiento configurado para esta biblioteca.</p>
-      </aside>
-    </div>
-    <footer class="footer">Tu música, organizada a tu manera.</footer>
-  </main>
+      <section>
+        <h2>Biblioteca por discos</h2>
+        <ul id="libraryTracks" class="track-list"><li class="muted">Cargando temas…</li></ul>
+      </section>
 
-  <script>
-    (() => {
-      const acceptedExtensions = new Set(['.aac', '.m4a', '.mp3', '.ogg', '.opus', '.wav']);
-      const form = document.querySelector('#uploadForm');
+      <section>
+        <h2>Playlist de la radio</h2>
+        <p id="playbackStatus" class="muted">Cargando playlist…</p>
+        <label><span><input id="repeatPlaylist" type="checkbox" style="width:auto;min-height:auto"> Repetir playlist al llegar al final (bucle)</span></label>
+        <ul id="playlistTracks" class="track-list"></ul>
+        <div class="row">
+          <button id="previousTrack" class="secondary" type="button">◀ Anterior</button>
+          <button id="togglePlayback" type="button">▶ Reproducir</button>
+          <button id="nextTrack" class="secondary" type="button">Siguiente ▶</button>
+        </div>
+      </section>
+
+      <section class="wide">
+        <h2>Programar canciones</h2>
+        <p class="hint">El servidor selecciona y reproduce el tema a la hora indicada. Puedes programarlo una vez, a diario o cada semana.</p>
+        <form id="scheduleForm" class="row">
+          <label for="scheduleTrack">Canción
+            <select id="scheduleTrack" required><option value="">Elige un tema</option></select>
+          </label>
+          <label for="scheduleTime">Fecha y hora
+            <input id="scheduleTime" type="datetime-local" required>
+          </label>
+          <label for="scheduleRecurrence">Repetir programación
+            <select id="scheduleRecurrence">
+              <option value="once">Una vez</option>
+              <option value="daily">Cada día</option>
+              <option value="weekly">Cada semana</option>
+            </select>
+          </label>
+          <button type="submit">Programar canción</button>
+        </form>
+        <ul id="schedules" class="track-list"></ul>
+      </section>
+    </main>
+
+    <script>
+      const notice = document.querySelector('#notice');
       const discSelect = document.querySelector('#discSelect');
-      const newDiscName = document.querySelector('#newDiscName');
-      const createDiscButton = document.querySelector('#createDiscButton');
-      const fileInput = document.querySelector('#fileInput');
-      const fileTitle = document.querySelector('#fileTitle');
-      const fileHint = document.querySelector('#fileHint');
-      const filenameInput = document.querySelector('#filenameInput');
-      const previewWrap = document.querySelector('#previewWrap');
-      const previewAudio = document.querySelector('#previewAudio');
-      const fileSize = document.querySelector('#fileSize');
+      const audioFiles = document.querySelector('#audioFiles');
       const uploadButton = document.querySelector('#uploadButton');
-      const formMessage = document.querySelector('#formMessage');
-      const discList = document.querySelector('#discList');
-      const libraryCount = document.querySelector('#libraryCount');
-      const connectionStatus = document.querySelector('#connectionStatus');
+      const libraryTracks = document.querySelector('#libraryTracks');
+      const playlistTracks = document.querySelector('#playlistTracks');
+      const scheduleTrack = document.querySelector('#scheduleTrack');
       let discs = [];
-      let previewUrl = '';
+      let state = null;
+      let schedules = [];
       let busy = false;
 
-      function showMessage(message, isError = false) {
-        formMessage.textContent = message;
-        formMessage.classList.toggle('error', isError);
-        formMessage.hidden = !message;
+      function showNotice(message, kind = '') {
+        notice.className = kind;
+        notice.textContent = message;
       }
 
       async function requestJson(url, options) {
         const response = await fetch(url, options);
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.message || `No se pudo completar la solicitud (${response.status}).`);
+        let payload;
+        try {
+          payload = await response.json();
+        } catch {
+          throw new Error('El servidor devolvió una respuesta inválida.');
+        }
+        if (!response.ok) throw new Error(payload.message || 'No se pudo completar la solicitud.');
         return payload;
       }
 
-      function updateUploadButton() {
-        uploadButton.disabled = busy || !discSelect.value || !fileInput.files.length;
+      function setBusy(value) {
+        busy = value;
+        document.querySelectorAll('button').forEach((button) => { button.disabled = value; });
+        updateUploadAvailability();
       }
 
-      function audioUrl(trackId) {
-        const query = new URLSearchParams({ id: trackId });
-        return `/api/audio?${query}`;
+      async function refresh() {
+        const [library, snapshot, scheduled] = await Promise.all([
+          requestJson('/api/discs'),
+          requestJson('/api/player/state'),
+          requestJson('/api/schedules'),
+        ]);
+        discs = library.discs;
+        state = snapshot;
+        schedules = scheduled.schedules;
+        renderDiscs();
+        renderLibrary();
+        renderPlaylist();
+        renderSchedules();
+        document.querySelector('#radioStatus').textContent =
+          `Radio conectada · ${state.queue.length} ${state.queue.length === 1 ? 'tema' : 'temas'} en playlist`;
+      }
+
+      function renderDiscs() {
+        const selected = discSelect.value;
+        discSelect.replaceChildren(new Option('Elige un disco', ''));
+        discs.forEach((disc) => discSelect.add(new Option(`${disc.name} (${disc.tracks.length})`, disc.name)));
+        discSelect.add(new Option('Crear disco nuevo…', '__create__'));
+        discSelect.value = [...discSelect.options].some((option) => option.value === selected) ? selected : '';
+        document.querySelector('#newDiscRow').hidden = discSelect.value !== '__create__';
+        updateUploadAvailability();
+      }
+
+      function updateUploadAvailability() {
+        const canUpload = !busy && Boolean(discSelect.value && discSelect.value !== '__create__');
+        audioFiles.disabled = !canUpload;
+        uploadButton.disabled = !canUpload || !audioFiles.files.length;
       }
 
       function renderLibrary() {
-        libraryCount.textContent = `${discs.length} ${discs.length === 1 ? 'disco' : 'discos'}`;
-        discList.replaceChildren();
-
-        if (!discs.length) {
-          const empty = document.createElement('div');
-          empty.className = 'empty-state';
-          empty.textContent = 'Todavía no hay discos. Crea uno para empezar a guardar tu música.';
-          discList.append(empty);
-          return;
-        }
-
+        libraryTracks.replaceChildren();
+        scheduleTrack.replaceChildren(new Option('Elige un tema', ''));
         for (const disc of discs) {
-          const details = document.createElement('details');
-          details.className = 'disc';
-          const summary = document.createElement('summary');
-          const name = document.createElement('span');
-          name.className = 'disc-name';
-          name.textContent = disc.name;
-          const count = document.createElement('span');
-          count.className = 'disc-count';
-          count.textContent = `${disc.tracks.length} ${disc.tracks.length === 1 ? 'tema' : 'temas'}`;
-          summary.append(name, count);
-          details.append(summary);
-
-          if (disc.tracks.length) {
-            const tracks = document.createElement('div');
-            tracks.className = 'track-list';
-            for (const track of disc.tracks) {
-              const row = document.createElement('div');
-              row.className = 'track';
-              const title = document.createElement('p');
-              title.className = 'track-name';
-              title.textContent = track.title;
-              const player = document.createElement('audio');
-              player.controls = true;
-              player.preload = 'none';
-              player.src = audioUrl(track.id);
-              player.setAttribute('aria-label', `Reproducir ${track.title}`);
-              row.append(title, player);
-              tracks.append(row);
-            }
-            details.append(tracks);
+          const heading = document.createElement('li');
+          heading.className = 'disc-title';
+          heading.textContent = disc.name;
+          libraryTracks.append(heading);
+          for (const track of disc.tracks) {
+            const row = document.createElement('li');
+            row.className = 'track';
+            const title = document.createElement('span');
+            title.textContent = track.title;
+            const add = document.createElement('button');
+            add.type = 'button';
+            add.className = 'secondary';
+            const inQueue = state.queue.some((queued) => queued.name === track.id);
+            add.textContent = inQueue ? 'En playlist' : 'Agregar';
+            add.disabled = busy || inQueue;
+            add.addEventListener('click', () => savePlaylist([...state.queue.map((item) => item.name), track.id]));
+            row.append(title, add);
+            libraryTracks.append(row);
+            scheduleTrack.add(new Option(`${disc.name} · ${track.title}`, track.id));
           }
-          discList.append(details);
+        }
+        if (!discs.some((disc) => disc.tracks.length)) {
+          const empty = document.createElement('li');
+          empty.className = 'muted';
+          empty.textContent = 'Todavía no hay temas cargados.';
+          libraryTracks.append(empty);
         }
       }
 
-      async function refreshLibrary(selectedId = discSelect.value) {
-        const payload = await requestJson('/api/discs');
-        discs = payload.discs;
+      function renderPlaylist() {
+        playlistTracks.replaceChildren();
+        document.querySelector('#repeatPlaylist').checked = state.repeat !== false;
+        document.querySelector('#playbackStatus').textContent = state.currentTrack
+          ? `${state.isPlaying ? 'Reproduciendo' : 'En pausa'}: ${state.currentTrack.title}`
+          : 'Sin canciones en la playlist';
+        state.queue.forEach((track, index) => {
+          const row = document.createElement('li');
+          row.className = 'track';
+          const title = document.createElement('span');
+          title.textContent = `${index + 1}. ${track.discName ? `${track.discName} · ` : ''}${track.title}${index === state.currentIndex ? ' · En reproducción' : ''}`;
+          const controls = document.createElement('div');
+          controls.className = 'track-actions';
+          const select = document.createElement('button');
+          select.type = 'button';
+          select.className = 'secondary';
+          select.textContent = 'Elegir';
+          select.disabled = busy;
+          select.addEventListener('click', () => radioAction('current', { index }));
+          const up = document.createElement('button');
+          up.type = 'button';
+          up.className = 'secondary';
+          up.textContent = '↑';
+          up.disabled = busy || index === 0;
+          up.addEventListener('click', () => reorder(index, -1));
+          const down = document.createElement('button');
+          down.type = 'button';
+          down.className = 'secondary';
+          down.textContent = '↓';
+          down.disabled = busy || index === state.queue.length - 1;
+          down.addEventListener('click', () => reorder(index, 1));
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'danger';
+          remove.textContent = 'Quitar';
+          remove.disabled = busy;
+          remove.addEventListener('click', () => savePlaylist(
+            state.queue.filter((_, position) => position !== index).map((item) => item.name),
+          ));
+          controls.append(select, up, down, remove);
+          row.append(title, controls);
+          playlistTracks.append(row);
+        });
+        document.querySelector('#togglePlayback').textContent = state.isPlaying ? '❚❚ Pausar' : '▶ Reproducir';
+        document.querySelector('#togglePlayback').disabled = busy || !state.queue.length;
+        document.querySelector('#previousTrack').disabled = busy || !state.queue.length;
+        document.querySelector('#nextTrack').disabled = busy || !state.queue.length;
+      }
 
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'Selecciona un disco';
-        discSelect.replaceChildren(placeholder);
-        for (const disc of discs) {
-          const option = document.createElement('option');
-          option.value = disc.id;
-          option.textContent = disc.name;
-          discSelect.append(option);
+      function renderSchedules() {
+        const container = document.querySelector('#schedules');
+        container.replaceChildren();
+        schedules.forEach((schedule) => {
+          const track = discs.flatMap((disc) => disc.tracks).find((item) => item.id === schedule.trackId);
+          const row = document.createElement('li');
+          row.className = 'track';
+          const label = document.createElement('span');
+          label.textContent = `${track ? `${track.discName} · ${track.title}` : schedule.trackId} — ${new Date(schedule.scheduledAt).toLocaleString()} · ${schedule.recurrence === 'once' ? 'Una vez' : schedule.recurrence === 'daily' ? 'Diaria' : 'Semanal'}`;
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'danger';
+          remove.textContent = 'Quitar';
+          remove.disabled = busy;
+          remove.addEventListener('click', () => saveSchedules(schedules.filter((entry) => entry.id !== schedule.id)));
+          row.append(label, remove);
+          container.append(row);
+        });
+        if (!schedules.length) {
+          const empty = document.createElement('li');
+          empty.className = 'muted';
+          empty.textContent = 'No hay canciones programadas.';
+          container.append(empty);
         }
-        if (discs.some((disc) => disc.id === selectedId)) discSelect.value = selectedId;
-        renderLibrary();
-        connectionStatus.textContent = 'Biblioteca conectada';
-        updateUploadButton();
       }
 
-      function formatSize(size) {
-        if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
-        return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-      }
-
-      function getFileExtension(filename) {
-        const dot = filename.lastIndexOf('.');
-        return dot < 0 ? '' : filename.slice(dot).toLowerCase();
-      }
-
-      function validFilename(filename) {
-        return filename.length > 0
-          && filename.length <= 180
-          && filename === filename.split(/[\\/]/).pop()
-          && !filename.startsWith('.')
-          && !/[\u0000-\u001f]/.test(filename)
-          && acceptedExtensions.has(getFileExtension(filename));
-      }
-
-      fileInput.addEventListener('change', () => {
-        const file = fileInput.files[0];
-        showMessage('');
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        previewUrl = '';
-        previewAudio.removeAttribute('src');
-        previewAudio.load();
-        previewWrap.hidden = true;
-
-        if (file) {
-          fileTitle.textContent = file.name;
-          fileHint.textContent = `${formatSize(file.size)} · Archivo seleccionado`;
-          filenameInput.value = file.name;
-          if (file.size > 100 * 1024 * 1024) {
-            showMessage('El archivo supera el límite de 100 MB.', true);
-          } else if (!acceptedExtensions.has(getFileExtension(file.name))) {
-            showMessage('El archivo debe tener una extensión de audio compatible: AAC, M4A, MP3, OGG, OPUS o WAV.', true);
-          } else {
-            previewUrl = URL.createObjectURL(file);
-            previewAudio.src = previewUrl;
-            previewWrap.hidden = false;
-            fileSize.textContent = formatSize(file.size);
-          }
-        } else {
-          fileTitle.textContent = 'Selecciona un archivo';
-          fileHint.textContent = 'MP3, M4A, WAV, OGG, OPUS o AAC';
-          filenameInput.value = '';
-        }
-        updateUploadButton();
-      });
-
-      discSelect.addEventListener('change', () => {
-        showMessage('');
-        updateUploadButton();
-      });
-
-      filenameInput.addEventListener('input', () => {
-        showMessage('');
-        updateUploadButton();
-      });
-
-      createDiscButton.addEventListener('click', async () => {
-        const name = newDiscName.value.trim();
-        if (!name) {
-          showMessage('Escribe el nombre del disco que quieres crear.', true);
-          newDiscName.focus();
-          return;
-        }
-        createDiscButton.disabled = true;
+      async function runAction(action, successMessage) {
+        if (busy) return;
+        setBusy(true);
         try {
-          const payload = await requestJson('/api/discs', {
+          await action();
+          await refresh();
+          showNotice(successMessage, 'success');
+        } catch (error) {
+          showNotice(error.message, 'error');
+        } finally {
+          setBusy(false);
+          if (state) renderPlaylist();
+        }
+      }
+
+      function savePlaylist(trackNames, repeat = state.repeat !== false) {
+        return runAction(async () => {
+          await requestJson('/api/player/playlist', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tracks: trackNames, repeat }),
+          });
+        }, 'Playlist actualizada.');
+      }
+
+      function reorder(index, direction) {
+        const names = state.queue.map((track) => track.name);
+        const target = index + direction;
+        [names[index], names[target]] = [names[target], names[index]];
+        return savePlaylist(names);
+      }
+
+      function radioAction(action, body = {}) {
+        return runAction(async () => {
+          if (action === 'playback') body.isPlaying = !state.isPlaying;
+          await requestJson(`/api/player/${action}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+        }, 'Control de reproducción actualizado.');
+      }
+
+      async function saveSchedules(nextSchedules) {
+        return runAction(async () => {
+          await requestJson('/api/schedules', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schedules: nextSchedules }),
+          });
+        }, 'Programación guardada.');
+      }
+
+      document.querySelector('#createDisc').addEventListener('click', () => {
+        const name = document.querySelector('#newDiscName').value.trim();
+        if (!name) return showNotice('Escribe el nombre del disco.', 'error');
+        runAction(async () => {
+          const result = await requestJson('/api/discs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name }),
           });
-          await refreshLibrary(payload.disc.id);
-          newDiscName.value = '';
-          showMessage(payload.created ? `Disco «${payload.disc.name}» creado. Ya está seleccionado para guardar el tema.` : `El disco «${payload.disc.name}» ya existía y quedó seleccionado.`);
-        } catch (error) {
-          showMessage(error.message, true);
-        } finally {
-          createDiscButton.disabled = false;
-        }
+          await refresh();
+          discSelect.value = result.disc.name;
+          document.querySelector('#newDiscName').value = '';
+          updateUploadAvailability();
+        }, 'Disco listo para recibir temas.');
       });
 
-      form.addEventListener('submit', async (event) => {
+      discSelect.addEventListener('change', () => {
+        document.querySelector('#newDiscRow').hidden = discSelect.value !== '__create__';
+        updateUploadAvailability();
+      });
+      audioFiles.addEventListener('change', updateUploadAvailability);
+
+      document.querySelector('#uploadForm').addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!form.reportValidity() || busy) return;
+        const files = [...audioFiles.files];
+        const disc = discSelect.value;
+        if (!files.length || !disc || disc === '__create__') return;
+        runAction(async () => {
+          for (const file of files) {
+            if (file.size > 100 * 1024 * 1024) throw new Error(`${file.name} supera el límite de 100 MB.`);
+            const response = await fetch(`/api/tracks?disc=${encodeURIComponent(disc)}`, {
+              method: 'POST',
+              headers: { 'X-File-Name': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream' },
+              body: file,
+            });
+            let result;
+            try { result = await response.json(); } catch { throw new Error('La biblioteca devolvió una respuesta inválida.'); }
+            if (!response.ok) throw new Error(`${file.name}: ${result.message || 'no se pudo subir.'}`);
+          }
+          audioFiles.value = '';
+        }, 'Temas subidos al disco.');
+      });
 
-        const file = fileInput.files[0];
-        const disc = discs.find((item) => item.id === discSelect.value);
-        const filename = filenameInput.value.trim();
-        if (!disc) {
-          showMessage('Selecciona un disco o crea uno antes de guardar el tema.', true);
-          discSelect.focus();
-          return;
-        }
-        if (!file || file.size === 0 || file.size > 100 * 1024 * 1024) {
-          showMessage('Selecciona un archivo de audio con contenido y de hasta 100 MB.', true);
-          return;
-        }
-        if (!validFilename(filename)) {
-          showMessage('Indica un nombre de archivo válido (máximo 180 caracteres, sin rutas y con extensión de audio compatible).', true);
-          filenameInput.focus();
-          return;
-        }
+      document.querySelector('#repeatPlaylist').addEventListener('change', () =>
+        savePlaylist(state.queue.map((track) => track.name), document.querySelector('#repeatPlaylist').checked));
+      document.querySelector('#previousTrack').addEventListener('click', () => radioAction('previous'));
+      document.querySelector('#nextTrack').addEventListener('click', () => radioAction('next'));
+      document.querySelector('#togglePlayback').addEventListener('click', () => radioAction('playback'));
 
-        busy = true;
-        updateUploadButton();
-        uploadButton.textContent = 'Subiendo tema…';
-        showMessage('');
+      document.querySelector('#scheduleForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const scheduledAt = new Date(document.querySelector('#scheduleTime').value);
+        if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+          showNotice('Elige una fecha y hora futura.', 'error');
+          return;
+        }
+        saveSchedules([...schedules, {
+          id: crypto.randomUUID(),
+          trackId: scheduleTrack.value,
+          scheduledAt: scheduledAt.toISOString(),
+          recurrence: document.querySelector('#scheduleRecurrence').value,
+        }]);
+      });
+
+      async function initialize() {
         try {
-          const query = new URLSearchParams({ disc: disc.name });
-          const payload = await requestJson(`/api/tracks?${query}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': file.type || 'application/octet-stream',
-              'X-File-Name': encodeURIComponent(filename),
-            },
-            body: file,
-          });
-          await refreshLibrary(disc.id);
-          form.reset();
-          discSelect.value = disc.id;
-          fileTitle.textContent = 'Selecciona un archivo';
-          fileHint.textContent = 'MP3, M4A, WAV, OGG, OPUS o AAC';
-          previewAudio.removeAttribute('src');
-          previewAudio.load();
-          previewWrap.hidden = true;
-          if (previewUrl) URL.revokeObjectURL(previewUrl);
-          previewUrl = '';
-          showMessage(`«${payload.track.name}» se guardó en el disco «${disc.name}».`);
+          await refresh();
         } catch (error) {
-          showMessage(error.message, true);
-        } finally {
-          busy = false;
-          uploadButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5V19a1 1 0 0 0 1 1h14v-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Guardar en el disco';
-          updateUploadButton();
+          document.querySelector('#radioStatus').textContent = error.message;
+          showNotice(error.message, 'error');
         }
-      });
+      }
 
-      window.addEventListener('beforeunload', () => {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-      });
-
-      refreshLibrary().catch((error) => {
-        connectionStatus.textContent = 'Sin conexión';
-        discList.replaceChildren();
-        const failure = document.createElement('div');
-        failure.className = 'empty-state';
-        failure.textContent = error.message || 'No se pudo cargar la biblioteca.';
-        discList.append(failure);
-        showMessage('No se pudo conectar con la biblioteca. Recarga la página para volver a intentar.', true);
-      });
-    })();
-  </script>
-</body>
+      initialize();
+      window.setInterval(() => {
+        if (!busy) refresh().catch((error) => showNotice(error.message, 'error'));
+      }, 10000);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js').catch((error) => {
+          showNotice(`No se pudo preparar la instalación sin conexión: ${error.message}`, 'error');
+        });
+      }
+    </script>
+  </body>
 </html>

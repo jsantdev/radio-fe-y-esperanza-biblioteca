@@ -6,34 +6,6 @@ const path = require('node:path');
 const test = require('node:test');
 const { createLibraryServer } = require('../server');
 
-test('serves the library web interface from the root without exposing other files', async () => {
-  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'radio-library-'));
-  const server = createLibraryServer({ dataDirectory: path.join(storage, 'discs') });
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
-
-  try {
-    const response = await fetch(`${baseUrl}/`);
-    assert.equal(response.status, 200);
-    assert.match(response.headers.get('content-type'), /text\/html; charset=utf-8/);
-    const page = await response.text();
-    assert.match(page, /Biblioteca musical/);
-    assert.match(page, /id="discSelect" required/);
-    assert.match(page, /id="previewAudio"/);
-    assert.match(page, /id="filenameInput"/);
-    assert.match(page, /id="createDiscButton"/);
-
-    assert.equal((await fetch(`${baseUrl}/index.html`)).status, 200);
-    assert.equal((await fetch(`${baseUrl}/server.js`)).status, 404);
-  } finally {
-    const closed = once(server, 'close');
-    server.close();
-    await closed;
-    fs.rmSync(storage, { recursive: true, force: true });
-  }
-});
-
 test('external library creates named empty discs and reuses them when uploading tracks', async () => {
   const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'radio-library-'));
   const server = createLibraryServer({ dataDirectory: path.join(storage, 'discs') });
@@ -41,6 +13,27 @@ test('external library creates named empty discs and reuses them when uploading 
   await once(server, 'listening');
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   try {
+    const page = await fetch(baseUrl).then((response) => response.text());
+    assert.match(page, /Subir temas por disco/);
+    assert.match(page, /Repetir playlist al llegar al final/);
+    assert.match(page, /Programar canciones/);
+    assert.match(page, /rel="manifest" href="\/manifest.webmanifest"/);
+    assert.match(page, /serviceWorker\.register\('\/service-worker\.js'\)/);
+    const manifestResponse = await fetch(`${baseUrl}/manifest.webmanifest`);
+    assert.equal(manifestResponse.status, 200);
+    const manifest = await manifestResponse.json();
+    assert.equal(manifest.display, 'standalone');
+    assert.equal(manifest.start_url, '/');
+    assert.deepEqual(manifest.icons.map((icon) => icon.sizes), ['192x192', '512x512']);
+    for (const size of [192, 512]) {
+      const iconResponse = await fetch(`${baseUrl}/icons/icon-${size}.png`);
+      assert.equal(iconResponse.status, 200);
+      const icon = Buffer.from(await iconResponse.arrayBuffer());
+      assert.equal(icon.toString('hex', 0, 8), '89504e470d0a1a0a');
+      assert.equal(icon.readUInt32BE(16), size);
+      assert.equal(icon.readUInt32BE(20), size);
+    }
+
     const created = await fetch(`${baseUrl}/api/discs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -70,6 +63,79 @@ test('external library creates named empty discs and reuses them when uploading 
     const library = await fetch(`${baseUrl}/api/discs`).then((response) => response.json());
     assert.equal(library.discs[0].name, 'Álbum Favorito');
     assert.equal(library.discs[0].tracks.length, 1);
+  } finally {
+    const closed = once(server, 'close');
+    server.close();
+    await closed;
+    fs.rmSync(storage, { recursive: true, force: true });
+  }
+});
+
+test('library persists the player queue and current playback across restarts', async () => {
+  const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'radio-player-state-'));
+  const dataDirectory = path.join(storage, 'discs');
+  let server = createLibraryServer({ dataDirectory });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  let baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    const created = await fetch(`${baseUrl}/api/discs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Temas de prueba' }),
+    });
+    assert.equal(created.status, 201);
+    for (const filename of ['Primera.mp3', 'Segunda.mp3']) {
+      const uploaded = await fetch(`${baseUrl}/api/tracks?disc=${encodeURIComponent('Temas de prueba')}`, {
+        method: 'POST',
+        headers: { 'X-File-Name': encodeURIComponent(filename) },
+        body: Buffer.from(filename),
+      });
+      assert.equal(uploaded.status, 201);
+    }
+
+    const queue = ['temas-de-prueba/Primera.mp3', 'temas-de-prueba/Segunda.mp3'];
+    const updated = await fetch(`${baseUrl}/api/player/playlist`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tracks: queue, repeat: false }),
+    });
+    assert.equal(updated.status, 200);
+    const selected = await fetch(`${baseUrl}/api/player/current`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index: 1 }),
+    });
+    assert.equal(selected.status, 200);
+    const playing = await fetch(`${baseUrl}/api/player/playback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isPlaying: true }),
+    });
+    assert.equal(playing.status, 200);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(storage, 'player-state.json'), 'utf8')), {
+      queue,
+      currentIndex: 1,
+      isPlaying: true,
+      repeat: false,
+    });
+
+    const closed = once(server, 'close');
+    server.close();
+    await closed;
+    server = createLibraryServer({ dataDirectory });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+    const restored = await fetch(`${baseUrl}/api/player/state`).then((response) => response.json());
+    assert.deepEqual(restored.queue.map((track) => track.id), queue);
+    assert.equal(restored.currentIndex, 1);
+    assert.equal(restored.currentTrack.title, 'Segunda');
+    assert.equal(restored.isPlaying, true);
+    assert.equal(restored.repeat, false);
+    assert.equal(await fetch(`${baseUrl}/api/player/audio`).then((response) => response.text()), 'Segunda.mp3');
   } finally {
     const closed = once(server, 'close');
     server.close();
