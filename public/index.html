@@ -31,7 +31,8 @@
       .row > * { flex: 1; min-width: 150px; }
       .track-list { display: grid; gap: 8px; padding: 0; list-style: none; }
       .track { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
-      .upload-file { display: grid; flex: 1; gap: 6px; min-width: 0; }
+      .upload-file { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1; gap: 6px; min-width: 0; }
+      .upload-file > span:first-child { grid-column: 1 / -1; }
       .track-actions { display: flex; gap: 5px; flex: 0 0 auto; }
       .track-actions button { min-width: 40px; }
       .disc-title { margin: 14px 0 4px; color: var(--accent); font-weight: 700; }
@@ -206,15 +207,20 @@
           label.className = 'upload-file';
           label.htmlFor = `uploadName-${index}`;
           label.append(document.createTextNode(`Nombre del tema ${index + 1}`));
+          const extension = file.name.slice(file.name.lastIndexOf('.'));
           const input = document.createElement('input');
           input.id = `uploadName-${index}`;
           input.type = 'text';
-          input.value = file.name;
+          input.value = file.name.slice(0, -extension.length);
           input.required = true;
-          input.maxLength = 180;
+          input.maxLength = 180 - extension.length;
           input.autocomplete = 'off';
           input.disabled = busy;
           label.append(input);
+          const suffix = document.createElement('span');
+          suffix.textContent = extension;
+          suffix.setAttribute('aria-label', `Extensión fija ${extension}`);
+          label.append(suffix);
           row.append(label);
           selectedFiles.append(row);
         });
@@ -408,12 +414,18 @@
 
       document.querySelector('#uploadForm').addEventListener('submit', (event) => {
         event.preventDefault();
-        const files = [...audioFiles.files].map((file, index) => ({
-          file,
-          name: selectedFiles.querySelector(`#uploadName-${index}`).value.trim(),
-        }));
+        const files = [...audioFiles.files].map((file, index) => {
+          const baseName = selectedFiles.querySelector(`#uploadName-${index}`).value.trim();
+          return {
+            file,
+            baseName,
+            name: baseName + file.name.slice(file.name.lastIndexOf('.')),
+          };
+        });
         const disc = discSelect.value;
         if (!files.length || !disc || disc === '__create__') return;
+        const unnamed = files.find(({ baseName }) => !baseName);
+        if (unnamed) return showNotice(`Escribe un nombre para ${unnamed.file.name}.`, 'error');
         runAction(async () => {
           for (const { file, name } of files) {
             if (file.size > 100 * 1024 * 1024) throw new Error(`${file.name} supera el límite de 100 MB.`);
