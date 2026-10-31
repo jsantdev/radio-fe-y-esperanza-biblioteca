@@ -1,4 +1,4 @@
-const CACHE_NAME = 'biblioteca-musical-v4';
+const CACHE_NAME = 'biblioteca-musical-v5';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {

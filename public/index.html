@@ -9,21 +9,25 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <title>Biblioteca musical | Radio</title>
     <style>
-      :root { color-scheme: dark; font: 16px "Segoe UI", sans-serif; color: #edf1ec; background: #0e120f; --surface: #151a16; --line: #29312b; --muted: #9aa59c; --accent: #c5f36b; }
+      :root { color-scheme: dark; font: 16px "Segoe UI", sans-serif; color: #edf1ec; background: #0c110e; --surface: #151d18; --line: #2a3930; --muted: #a7b5aa; --accent: #c5f36b; --accent-soft: #1d2b20; }
       * { box-sizing: border-box; }
-      body { max-width: 1100px; margin: auto; padding: 24px 16px 48px; }
-      header, section { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 18px; }
+      body { max-width: 1100px; margin: auto; padding: 24px 16px 48px; background: radial-gradient(ellipse at 50% -20%, #263b2b 0, transparent 55%); }
+      header, section { border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(145deg, #18211b, var(--surface) 70%); padding: 20px; box-shadow: 0 12px 30px #0002; }
       header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
       h1, h2, p { margin-top: 0; }
-      h1 { margin-bottom: 4px; font-size: 1.6rem; }
-      h2 { font-size: 1.1rem; }
+      h1 { margin-bottom: 6px; font-size: clamp(1.7rem, 5vw, 2.2rem); letter-spacing: -.03em; }
+      h2 { font-size: 1.15rem; }
       .muted, .hint { color: var(--muted); }
       .hint { line-height: 1.5; }
       .layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
       .wide { grid-column: 1 / -1; }
+      .app-nav { position: sticky; top: 8px; z-index: 5; display: flex; gap: 8px; overflow-x: auto; margin: 12px 0; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #111a16ed; backdrop-filter: blur(12px); }
+      .app-nav a { flex: 0 0 auto; padding: 9px 13px; border-radius: 10px; color: inherit; background: #202b24; text-decoration: none; font-weight: 650; }
+      .app-nav a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       label { display: grid; gap: 7px; }
       input, select { width: 100%; min-height: 42px; padding: 9px; border: 1px solid #465047; border-radius: 8px; color: inherit; background: #111612; font: inherit; }
-      button { min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: 8px; color: #17200c; background: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+      button { min-height: 44px; padding: 9px 14px; border: 1px solid transparent; border-radius: 11px; color: #17200c; background: var(--accent); font: inherit; font-weight: 700; cursor: pointer; transition: transform .15s ease, filter .15s ease; }
+      button:not(:disabled):active { transform: scale(.98); filter: brightness(.92); }
       button.secondary { border-color: var(--line); color: inherit; background: #202822; }
       button.danger { border-color: #614044; color: #ffc9cb; background: #382427; }
       button:disabled { cursor: not-allowed; opacity: .5; }
@@ -31,6 +35,8 @@
       .row > * { flex: 1; min-width: 150px; }
       .track-list { display: grid; gap: 8px; padding: 0; list-style: none; }
       .track { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+      .library-track { padding: 10px 12px; border-radius: 12px; background: #111813; }
+      .track-title { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
       .upload-file { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1; gap: 6px; min-width: 0; }
       .upload-file > span:first-child { grid-column: 1 / -1; }
       .track-actions { display: flex; gap: 5px; flex: 0 0 auto; }
@@ -41,12 +47,24 @@
       #notice { min-height: 1.4em; margin: 10px 0; }
       .error { color: #ff9298; }
       .success { color: var(--accent); }
-      #radioStatus { color: var(--accent); }
+      #radioStatus { margin: 0; padding: 9px 13px; border: 1px solid #36533b; border-radius: 999px; color: var(--accent); background: var(--accent-soft); }
       @media (max-width: 680px) {
-        .layout { grid-template-columns: 1fr; }
+        body { padding: 12px 12px 32px; }
+        header, section { padding: 16px; border-radius: 16px; }
+        header { align-items: flex-start; }
+        header > div { width: 100%; }
+        header > div > .hint:nth-of-type(2) { display: none; }
+        .layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
         .wide { grid-column: auto; }
-        .track { align-items: stretch; flex-direction: column; }
-        .track-actions button { flex: 1; }
+        .track { align-items: flex-start; }
+        .library-track { align-items: center; flex-direction: row; }
+        .library-track .track-title { flex: 1; }
+        .library-track button { flex: 0 0 auto; min-width: 94px; }
+        .track-actions { width: 100%; flex-wrap: wrap; }
+        .track-actions button { flex: 1; min-width: 62px; }
+        .row > * { min-width: 0; }
+        #scheduleForm > * { flex-basis: 100%; }
+        #togglePlayback { min-width: 125px; }
       }
     </style>
   </head>
@@ -61,10 +79,16 @@
       </div>
       <p id="radioStatus" role="status">Conectando con la radio…</p>
     </header>
+    <nav class="app-nav" aria-label="Navegación">
+      <a href="#librarySection">Biblioteca</a>
+      <a href="#playlistSection">Playlist</a>
+      <a href="#uploadSection">Subir temas</a>
+      <a href="#scheduleSection">Programar</a>
+    </nav>
     <p id="notice" role="status" aria-live="polite"></p>
 
     <main class="layout">
-      <section>
+      <section id="uploadSection">
         <h2>Subir temas por disco</h2>
         <form id="uploadForm">
           <label for="discSelect">Disco de destino
@@ -91,12 +115,12 @@
         </form>
       </section>
 
-      <section>
+      <section id="librarySection">
         <h2>Biblioteca por discos</h2>
         <ul id="libraryTracks" class="track-list"><li class="muted">Cargando temas…</li></ul>
       </section>
 
-      <section>
+      <section id="playlistSection">
         <h2>Playlist de la radio</h2>
         <p id="playbackStatus" class="muted">Cargando playlist…</p>
         <label><span><input id="repeatPlaylist" type="checkbox" style="width:auto;min-height:auto"> Repetir playlist al llegar al final (bucle)</span></label>
@@ -108,7 +132,7 @@
         </div>
       </section>
 
-      <section class="wide">
+      <section id="scheduleSection" class="wide">
         <h2>Programar canciones</h2>
         <p class="hint">El servidor selecciona y reproduce el tema a la hora indicada. Puedes programarlo una vez, a diario o cada semana.</p>
         <form id="scheduleForm" class="row">
@@ -280,14 +304,21 @@
             const row = document.createElement('li');
             row.className = 'track';
             const title = document.createElement('span');
+            title.className = 'track-title';
             title.textContent = track.title;
             const add = document.createElement('button');
             add.type = 'button';
             add.className = 'secondary';
-            const inQueue = state.queue.some((queued) => queued.name === track.id);
+            const inQueue = state.queue.some((queued) => queued.id === track.id);
             add.textContent = inQueue ? 'En playlist' : 'Agregar';
             add.disabled = busy || inQueue;
-            add.addEventListener('click', () => savePlaylist([...state.queue.map((item) => item.name), track.id]));
+            add.addEventListener('click', () => savePlaylist(
+              [...state.queue.map((item) => item.id), track.id],
+              state.repeat !== false,
+              `${track.title} agregado a la playlist.`,
+            ));
+            row.classList.add('library-track');
+            row.setAttribute('aria-label', `${track.title}, disco ${disc.name}`);
             row.append(title, add);
             libraryTracks.append(row);
             scheduleTrack.add(new Option(`${disc.name} · ${track.title}`, track.id));
@@ -311,6 +342,7 @@
           const row = document.createElement('li');
           row.className = 'track';
           const title = document.createElement('span');
+          title.className = 'track-title';
           title.textContent = `${index + 1}. ${track.discName ? `${track.discName} · ` : ''}${track.title}${index === state.currentIndex ? ' · En reproducción' : ''}`;
           const controls = document.createElement('div');
           controls.className = 'track-actions';
@@ -338,7 +370,7 @@
           remove.textContent = 'Quitar';
           remove.disabled = busy;
           remove.addEventListener('click', () => savePlaylist(
-            state.queue.filter((_, position) => position !== index).map((item) => item.name),
+            state.queue.filter((_, position) => position !== index).map((item) => item.id),
           ));
           controls.append(select, up, down, remove);
           row.append(title, controls);
@@ -391,18 +423,18 @@
         }
       }
 
-      function savePlaylist(trackNames, repeat = state.repeat !== false) {
+      function savePlaylist(trackNames, repeat = state.repeat !== false, successMessage = 'Playlist actualizada.') {
         return runAction(async () => {
           await requestJson('/api/player/playlist', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tracks: trackNames, repeat }),
           });
-        }, 'Playlist actualizada.');
+        }, successMessage);
       }
 
       function reorder(index, direction) {
-        const names = state.queue.map((track) => track.name);
+        const names = state.queue.map((track) => track.id);
         const target = index + direction;
         [names[index], names[target]] = [names[target], names[index]];
         return savePlaylist(names);
@@ -499,7 +531,7 @@
       });
 
       document.querySelector('#repeatPlaylist').addEventListener('change', () =>
-        savePlaylist(state.queue.map((track) => track.name), document.querySelector('#repeatPlaylist').checked));
+        savePlaylist(state.queue.map((track) => track.id), document.querySelector('#repeatPlaylist').checked));
       document.querySelector('#previousTrack').addEventListener('click', () => radioAction('previous'));
       document.querySelector('#nextTrack').addEventListener('click', () => radioAction('next'));
       document.querySelector('#togglePlayback').addEventListener('click', () => radioAction('playback'));
