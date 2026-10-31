@@ -36,6 +36,8 @@
       .track-actions { display: flex; gap: 5px; flex: 0 0 auto; }
       .track-actions button { min-width: 40px; }
       .disc-title { margin: 14px 0 4px; color: var(--accent); font-weight: 700; }
+      #uploadProgress { display: block; width: 100%; height: 12px; margin-top: 10px; accent-color: var(--accent); }
+      #uploadProgress[hidden] { display: none; }
       #notice { min-height: 1.4em; margin: 10px 0; }
       .error { color: #ff9298; }
       .success { color: var(--accent); }
@@ -84,6 +86,8 @@
             <ul id="selectedFiles" class="track-list"></ul>
             <p class="hint">MP3, WAV, OGG, OPUS, M4A o AAC · Máximo 100 MB por tema.</p>
           <button id="uploadButton" type="submit" disabled>Subir temas</button>
+          <progress id="uploadProgress" max="100" value="0" hidden aria-label="Progreso de carga"></progress>
+          <p id="uploadProgressText" class="hint" role="status" aria-live="polite" hidden></p>
         </form>
       </section>
 
@@ -133,6 +137,8 @@
       const audioFiles = document.querySelector('#audioFiles');
       const selectedFiles = document.querySelector('#selectedFiles');
       const uploadButton = document.querySelector('#uploadButton');
+      const uploadProgress = document.querySelector('#uploadProgress');
+      const uploadProgressText = document.querySelector('#uploadProgressText');
       const libraryTracks = document.querySelector('#libraryTracks');
       const playlistTracks = document.querySelector('#playlistTracks');
       const scheduleTrack = document.querySelector('#scheduleTrack');
@@ -196,6 +202,42 @@
         const canUpload = !busy && Boolean(discSelect.value && discSelect.value !== '__create__');
         audioFiles.disabled = !canUpload;
         uploadButton.disabled = !canUpload || !audioFiles.files.length;
+      }
+
+      function updateUploadProgress(percent, message) {
+        uploadProgress.hidden = false;
+        uploadProgressText.hidden = false;
+        uploadProgress.value = percent;
+        uploadProgressText.textContent = message;
+      }
+
+      function uploadFile(file, name, onProgress) {
+        return new Promise((resolve, reject) => {
+          const request = new XMLHttpRequest();
+          request.open('POST', `/api/tracks?disc=${encodeURIComponent(discSelect.value)}`);
+          request.setRequestHeader('X-File-Name', encodeURIComponent(name));
+          request.setRequestHeader('Content-Type', 'application/octet-stream');
+          request.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) onProgress(event.loaded / event.total);
+          });
+          request.addEventListener('load', () => {
+            let result;
+            try {
+              result = JSON.parse(request.responseText);
+            } catch {
+              reject(new Error('La biblioteca devolvió una respuesta inválida.'));
+              return;
+            }
+            if (request.status < 200 || request.status >= 300) {
+              reject(new Error(`${name}: ${result.message || 'no se pudo subir.'}`));
+              return;
+            }
+            resolve();
+          });
+          request.addEventListener('error', () => reject(new Error(`Error de conexión al subir ${name}.`)));
+          request.addEventListener('abort', () => reject(new Error(`Se canceló la carga de ${name}.`)));
+          request.send(file);
+        });
       }
 
       function renderSelectedFiles() {
@@ -409,6 +451,8 @@
       });
       audioFiles.addEventListener('change', () => {
         renderSelectedFiles();
+        uploadProgress.hidden = true;
+        uploadProgressText.hidden = true;
         updateUploadAvailability();
       });
 
@@ -427,17 +471,28 @@
         const unnamed = files.find(({ baseName }) => !baseName);
         if (unnamed) return showNotice(`Escribe un nombre para ${unnamed.file.name}.`, 'error');
         runAction(async () => {
-          for (const { file, name } of files) {
-            if (file.size > 100 * 1024 * 1024) throw new Error(`${file.name} supera el límite de 100 MB.`);
-            const response = await fetch(`/api/tracks?disc=${encodeURIComponent(disc)}`, {
-              method: 'POST',
-              headers: { 'X-File-Name': encodeURIComponent(name), 'Content-Type': 'application/octet-stream' },
-              body: file,
-            });
-            let result;
-            try { result = await response.json(); } catch { throw new Error('La biblioteca devolvió una respuesta inválida.'); }
-            if (!response.ok) throw new Error(`${name}: ${result.message || 'no se pudo subir.'}`);
+          const weights = files.map(({ file }) => Math.max(file.size, 1));
+          const totalWeight = weights.reduce((sum, size) => sum + size, 0);
+          let completedWeight = 0;
+          updateUploadProgress(0, `Preparando ${files.length === 1 ? 'el tema' : `los ${files.length} temas`}…`);
+          try {
+            for (const [index, { file, name }] of files.entries()) {
+              if (file.size > 100 * 1024 * 1024) throw new Error(`${file.name} supera el límite de 100 MB.`);
+              updateUploadProgress(
+                (completedWeight / totalWeight) * 100,
+                `Subiendo tema ${index + 1} de ${files.length}: 0%`,
+              );
+              await uploadFile(file, name, (fraction) => {
+                const percent = ((completedWeight + weights[index] * fraction) / totalWeight) * 100;
+                updateUploadProgress(percent, `Subiendo tema ${index + 1} de ${files.length}: ${Math.floor(fraction * 100)}%`);
+              });
+              completedWeight += weights[index];
+            }
+          } catch (error) {
+            uploadProgressText.textContent = `Carga interrumpida: ${error.message}`;
+            throw error;
           }
+          updateUploadProgress(100, `${files.length === 1 ? 'Tema subido' : 'Temas subidos'}: 100%`);
           audioFiles.value = '';
           renderSelectedFiles();
         }, 'Temas subidos al disco.');
